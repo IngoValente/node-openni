@@ -114,41 +114,6 @@ namespace nodeopenni {
     callback->Call(handle_, 2, argv);
   }
 
-  ///// Center of Mass Events
-
-  void
-  Context::ComPosEventAsync(const char * eventType, uint userId, int x, int y, int z)
-  {
-    ComPosEvent * ev = (ComPosEvent *) malloc(sizeof(ComPosEvent));
-    ev->type = eventType;
-    ev->userId = userId;
-    ev->x = x;
-    ev->y = y;
-    ev->z = z;
-    ev->context = this;
-    this->uv_async_com_pos_event_callback_.data = ev;
-    uv_async_send(&this->uv_async_com_pos_event_callback_);
-  }
-
-  static void
-  async_com_pos_event_callback_(uv_async_t *handle, int notUsed)
-  {
-    ComPosEvent * event = (ComPosEvent *) handle->data;
-    assert(event);
-    nodeopenni::Context * context = (nodeopenni::Context * ) event->context;
-    assert(context);
-    context->EmitComPosEvent(event);
-    free(event);
-  }
-
-  void
-  Context::EmitComPosEvent(ComPosEvent * event)
-  {
-    Local<Value> callback_v = handle_->Get(this->emitSymbol_);
-    Local<Function> callback = Local<Function>::Cast(callback_v);
-    Handle<Value> argv[5] = { String::New(event->type), Number::New(event->userId), Number::New(event->x), Number::New(event->y), Number::New(event->z)};
-    callback->Call(handle_, 5, argv);
-  }
 
   ///// Joint Change Event Callback
 
@@ -216,22 +181,12 @@ namespace nodeopenni {
 
     JointPos   *jointPos;
     XnSkeletonJointPosition newJointPos;
-
-    XnPoint3D newComPos;
-
     uv_async_t * callback;
 
     for (int i = 0; i < nUsers && i < NODE_OPENNI_MAX_USERS; ++i)
     {
       if (this->users_[aUsers[i]])
       {
-
-        if (this->comTracking_)
-        {
-          this->userGenerator_.GetCoM(aUsers[i], newComPos);
-          this->ComPosEventAsync("com_position", aUsers[i], newComPos.X, newComPos.Y, newComPos.Z);
-        }
-
         for (int j = 0; j < NODE_OPENNI_JOINT_COUNT; j++) {
 
           if (! this->joints_[j]) continue;
@@ -344,12 +299,6 @@ namespace nodeopenni {
 
     uv_async_init(loop, &uv_async_user_event_callback_, async_user_event_callback_);
 
-
-    // Initialize the center of mass event callback
-
-    uv_async_init(loop, &uv_async_com_pos_event_callback_, async_com_pos_event_callback_);
-
-
     // Initialize the async error callback
 
     uv_async_init(loop, &this->uv_async_error_callback_, async_error_callback_);
@@ -363,18 +312,10 @@ namespace nodeopenni {
       }
     }
 
-    this->gesture_generator_.Create(this->context_);
-    this->gesture_generator_.RegisterGestureCallbacks(Gesture_Recognized, Gesture_Process, this, this->gestureCallbackHandle_);
-
-
     // Start the joint pos polling thread
     this->InitPollThread();
 
     printf("initiated poll thread.\n");
-
-    status = this->gesture_generator_.AddGesture("Click",this->boundingBox_);
-    status = this->gesture_generator_.AddGesture("Wave",this->boundingBox_);
-    if (hasError(status)) return error("registering gesture", status);
 
     status = this->context_.StartGeneratingAll();
     if (hasError(status)) return error("starting to generate all", status);
@@ -415,17 +356,15 @@ namespace nodeopenni {
     }
 
     // Initialize user presence
-    for (int i = 0; i < NODE_OPENNI_MAX_USERS; ++i)
+    for (int i = 0; i <= NODE_OPENNI_MAX_USERS; ++i)
     {
       this->users_[i] = FALSE;
     }
 
-    for (int j = 0; j < NODE_OPENNI_JOINT_COUNT; ++j)
+    for (int j = 0; j <= NODE_OPENNI_JOINT_COUNT; ++j)
     {
       this->joints_[j] = TRUE;
     }
-
-    this->comTracking_ = FALSE;
 
     // Initialize Error
     this->lastError_.context = this;
@@ -455,35 +394,6 @@ namespace nodeopenni {
     return args.This();
   }
 
-  ///// StartCOMTracking
-  Handle<Value>
-  Context::StartCOMTracking()
-  {
-    this->comTracking_ = TRUE;
-    return Undefined();
-  }
-
-  Handle<Value>
-  Context::StartCOMTracking(const Arguments& args)
-  {
-    HandleScope scope;
-    return GetContext(args)->StartCOMTracking();
-  }
-
-  ///// StopCOMTracking
-  Handle<Value>
-  Context::StopCOMTracking()
-  {
-    this->comTracking_ = FALSE;
-      return Undefined();
-  }
-
-  Handle<Value>
-  Context::StopCOMTracking(const Arguments& args)
-  {
-    HandleScope scope;
-    return GetContext(args)->StopCOMTracking();
-  }
 
   ///// SetJoints
 
@@ -560,8 +470,6 @@ namespace nodeopenni {
     t->InstanceTemplate()->SetInternalFieldCount(1);
 
     NODE_SET_PROTOTYPE_METHOD(t, "setJoints", SetJoints);
-    NODE_SET_PROTOTYPE_METHOD(t, "startCOMTracking", StartCOMTracking);
-    NODE_SET_PROTOTYPE_METHOD(t, "stopCOMTracking", StopCOMTracking);
     NODE_SET_PROTOTYPE_METHOD(t, "close", Close);
 
     target->Set(String::NewSymbol("Context"), t->GetFunction());

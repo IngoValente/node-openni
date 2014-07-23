@@ -4,14 +4,6 @@ OpenNI bindings in Node.js.
 
 Supports multiple users.
 
------
-
-## Looking for maintainer(s)!!
-
-Ping the author if you're interested!
-
------
-
 # Install
 
 Install libusb and OpenNI following the platform-specific instructions at https://github.com/OpenNI/OpenNI.
@@ -124,18 +116,6 @@ You can specify exactly which joints you want to be tracked:
 context.setJoints(['head', 'left_hand', 'right_hand']);
 ```
 
-#Gestures
-Two gestures added: Wave and Click.
-##Gesture Callbacks
-```js
-context.on('Wave', function(gesture) {
-  console.log('wave');
-});
-
-context.on('Click', function(gesture) {
-  console.log('click');
-}
-```
 # Licence
 
 MIT
